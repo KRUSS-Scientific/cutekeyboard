@@ -4,6 +4,7 @@ struct InputPanelIface::InputPanelIfacePrivate {
     QColor backgroundColor{};
     QColor btnBackgroundColor{};
     QColor btnSpecialBackgroundColor{};
+    QColor btnEnterBackgroundColor{};
     QColor btnTextColor{};
     int btnBorderWidth{};
     int btnRadius{};
@@ -60,6 +61,18 @@ void InputPanelIface::setBtnSpecialBackgroundColor(
     if (pimpl->btnSpecialBackgroundColor != btnSpecialBackgroundColor) {
         pimpl->btnSpecialBackgroundColor = btnSpecialBackgroundColor;
         emit btnSpecialBackgroundColorChanged();
+    }
+}
+
+QColor InputPanelIface::btnEnterBackgroundColor() const {
+    return pimpl->btnEnterBackgroundColor;
+}
+
+void InputPanelIface::setBtnEnterBackgroundColor(
+    const QColor &btnEnterBackgroundColor) {
+    if (pimpl->btnEnterBackgroundColor != btnEnterBackgroundColor) {
+        pimpl->btnEnterBackgroundColor = btnEnterBackgroundColor;
+        emit btnEnterBackgroundColorChanged();
     }
 }
 

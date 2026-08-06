@@ -151,14 +151,14 @@ ColumnLayout {
         }
 
         Key {
-            btnKey: Qt.Key_AE
-            btnText: "æ"
+            btnKey: Qt.Key_Ooblique
+            btnText: "ø"
             inputPanelRef: inputPanel
         }
 
         Key {
-            btnKey: Qt.Key_Ooblique
-            btnText: "ø"
+            btnKey: Qt.Key_AE
+            btnText: "æ"
             inputPanelRef: inputPanel
         }
 
@@ -274,6 +274,5 @@ ColumnLayout {
         }
 
     }
-
-
 }
+

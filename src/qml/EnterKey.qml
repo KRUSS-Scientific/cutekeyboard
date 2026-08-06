@@ -6,7 +6,7 @@ Key {
     btnKey: Qt.Key_Enter
     repeatable: true
     showPreview: false
-    btnBackground: InputPanel.btnSpecialBackgroundColor
+    btnBackground: InputPanel.btnEnterBackgroundColor
     btnText: "\n"
     btnDisplayedText: InputPanel.enterIcon === "" && enabled ? "Enter" : ""
     btnIcon: InputPanel.enterIcon === "" && !enabled ? "" : InputPanel.enterIcon
