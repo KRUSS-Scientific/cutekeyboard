@@ -10,6 +10,7 @@
 #include "EnterKeyAction.hpp"
 #include "EnterKeyActionAttachedType.hpp"
 #include "InputPanelIface.hpp"
+#include <QPointer>
 #include <QQmlEngine>
 
 /**
@@ -19,8 +20,8 @@ class VirtualKeyboardInputContextPrivate {
    public:
     VirtualKeyboardInputContextPrivate();
 
-    QQuickFlickable *Flickable;
-    QQuickItem *FocusItem;
+    QPointer<QQuickFlickable> Flickable;
+    QPointer<QQuickItem> FocusItem;
     bool Visible;
     DeclarativeInputEngine *InputEngine;
     QPropertyAnimation *FlickableContentScrollAnimation{nullptr};
@@ -29,9 +30,7 @@ class VirtualKeyboardInputContextPrivate {
 };
 
 VirtualKeyboardInputContextPrivate::VirtualKeyboardInputContextPrivate()
-    : Flickable(0),
-      FocusItem(0),
-      Visible(false),
+    : Visible(false),
       InputEngine(new DeclarativeInputEngine()),
       inputPanelIface(new InputPanelIface()) {}
 
@@ -46,6 +45,7 @@ VirtualKeyboardInputContext::VirtualKeyboardInputContext()
         "CuteKeyboard", 1, 0, "InputEngine", inputEngineProvider);
     connect(d->InputEngine, &DeclarativeInputEngine::animatingChanged, this,
             &VirtualKeyboardInputContext::ensureFocusedObjectVisible);
+    connect(d->InputEngine, &DeclarativeInputEngine::keyboardRectangleChanged, this, &VirtualKeyboardInputContext::emitKeyboardRectChanged);
 
     qmlRegisterSingletonType<InputPanelIface>("CuteKeyboard", 1, 0,
                                               "InputPanel", inputPanelProvider);
@@ -65,6 +65,14 @@ VirtualKeyboardInputContext *VirtualKeyboardInputContext::instance() {
 }
 
 QObject *VirtualKeyboardInputContext::inputItem() const { return d->FocusItem; }
+
+void VirtualKeyboardInputContext::setFocusItem(QQuickItem *item) {
+    if (d->FocusItem == item) {
+        return;
+    }
+    d->FocusItem = item;
+    emit inputItemChanged();
+}
 
 bool VirtualKeyboardInputContext::focusItemHasEnterKeyAction(
     QObject *item) const {
@@ -114,34 +122,30 @@ void VirtualKeyboardInputContext::setFocusObject(QObject *object) {
                                          Qt::ImhTime |
                                          Qt::ImhFormattedNumbersOnly;
 
-    if (!object) {
+    QObject::disconnect(visibleConnection);
+    QObject::disconnect(destroyedConnection);
+    d->Flickable = nullptr;
+
+    QQuickItem *newFocusItem = dynamic_cast<QQuickItem *>(object);
+    if (!newFocusItem) {
+        setFocusItem(nullptr);
+        hideInputPanel();
         return;
     }
 
-    d->FocusItem = dynamic_cast<QQuickItem *>(object);
-    if (!d->FocusItem) {
-        return;
-    }
-
-    bool AcceptsInput = d->FocusItem->inputMethodQuery(Qt::ImEnabled).toBool();
+    bool AcceptsInput = newFocusItem->inputMethodQuery(Qt::ImEnabled).toBool();
     if (!AcceptsInput) {
-        if (isInputPanelVisible()) {
-            hideInputPanel();
-        }
+        setFocusItem(nullptr);
+        hideInputPanel();
         return;
     }
 
-    // set the focusItem as parent of InputPanel
+    d->FocusItem = newFocusItem;
+
     if (QObject *item = inputItem()) {
-        // ToDo: the InputPanel is set once, so cast can be done at register QQuickItem
         if (QQuickItem *vkbPanel = qobject_cast<QQuickItem*>(inputPanel)) {
-            // ToDo: cast of inputItem is overflow ... use d->FocusItem
             if (QQuickItem *quickItem = qobject_cast<QQuickItem*>(item)) {
                 const QVariant isRootItem = vkbPanel->property("__isRootItem");
-                /*
-                    For integrated keyboards, make sure it's a sibling to the overlay. The
-                    high z-order will make sure it gets events also during a modal session.
-                */
                 if (isRootItem.isValid() && !isRootItem.toBool()) {
                     vkbPanel->setParentItem(quickItem->window()->contentItem());
                     vkbPanel->setProperty("__reparented", true);
@@ -149,6 +153,25 @@ void VirtualKeyboardInputContext::setFocusObject(QObject *object) {
             }
         }
     }
+
+    visibleConnection = QObject::connect(
+        d->FocusItem.data(), &QQuickItem::visibleChanged, this, [this]() {
+            if (!d->FocusItem) {
+                return;
+            }
+            if (!d->FocusItem->isVisible())
+                hideInputPanel();
+            else
+                showInputPanel();
+        });
+
+    destroyedConnection = QObject::connect(
+        d->FocusItem.data(), &QObject::destroyed, this, [this]() {
+            d->FocusItem = nullptr;
+            d->Flickable = nullptr;
+            emit inputItemChanged();
+            hideInputPanel();
+        });
 
     emit inputItemChanged();
 
@@ -165,7 +188,6 @@ void VirtualKeyboardInputContext::setFocusObject(QObject *object) {
     } else {
         d->InputEngine->setInputMode(DeclarativeInputEngine::Letters);
         d->InputEngine->setSymbolMode(false);
-        // Auto-capitalize on focus if enabled, field supports autocapitalize, and field is empty
         bool shouldUppercase = d->InputEngine->isAutoCapitalize() &&
                                fieldSupportsAutoCapitalize() &&
                                surroundingText().isEmpty();
@@ -173,7 +195,6 @@ void VirtualKeyboardInputContext::setFocusObject(QObject *object) {
     }
 
     QQuickItem *i = d->FocusItem;
-    d->Flickable = 0;
     while (i) {
         QQuickFlickable *Flickable = dynamic_cast<QQuickFlickable *>(i);
         if (Flickable) {
@@ -199,7 +220,8 @@ bool VirtualKeyboardInputContext::fieldSupportsAutoCapitalize() const {
 }
 
 void VirtualKeyboardInputContext::ensureFocusedObjectVisible() {
-    if (!d->Visible || !d->Flickable || d->InputEngine->isAnimating()) {
+    if (!d->Visible || !d->Flickable || !d->FocusItem ||
+        d->InputEngine->isAnimating()) {
         return;
     }
 
