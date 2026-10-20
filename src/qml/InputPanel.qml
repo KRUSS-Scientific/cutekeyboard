@@ -28,8 +28,6 @@ Item {
     property alias emptySpaceBar: layoutLoader.emptySpaceBar
     property bool persistentShift: true
     property bool autoCapitalize: false
-    //! \internal
-    readonly property bool __isRootItem: root.parent !== null && root.parent.parent === null
 
     function showKeyPopup(keyButton) {
         keyPopup.popup(keyButton, root);
@@ -77,7 +75,6 @@ Item {
     onPersistentShiftChanged: InputEngine.persistentUppercase = persistentShift
     onAutoCapitalizeChanged: InputEngine.autoCapitalize = autoCapitalize
     Component.onCompleted: {
-        InputContext.registerInputPanel(root);
         if (availableLanguageLayouts.length == 0)
             availableLanguageLayouts = ["En"];
 
@@ -102,6 +99,7 @@ Item {
         InputEngine.persistentUppercase = persistentShift;
         InputEngine.autoCapitalize = autoCapitalize;
         loadLettersLayout();
+        InputContext.registerInputPanel(root);
     }
 
     KeyPopup {
